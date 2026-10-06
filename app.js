@@ -68,3 +68,36 @@ function renderRecords(){
   e.innerHTML=db.records.length?db.records.map(r=>"<tr><td>"+esc(r.date)+"</td><td>"+esc(r.project)+"</td><td>"+esc(r.title)+"</td><td>"+esc(r.status)+"</td><td><button class='btn' onclick='editRec("+r.id+")'>열기</button> <button class='btn danger' onclick='delRec("+r.id+")'>삭제</button></td></tr>").join(""):"<tr><td colspan='5' class='muted'>아직 저장된 콘텐츠가 없습니다.</td></tr>";
 }
 document.getElementById("project").addEventListener("change",function(){projectSafety();suggest();});
+
+/* BLOG FACTORY v1.5 AI bridge */
+function aiEndpoint(){return (db.settings&&db.settings.aiEndpoint)||""}
+const _saveSettings=saveSettings;
+saveSettings=function(){
+  db.settings={blogId:document.getElementById("blogId").value,identity:document.getElementById("identity").value,length:document.getElementById("length").value,freq:document.getElementById("freq").value,aiEndpoint:document.getElementById("aiEndpoint").value.trim()};
+  persist();alert("저장했습니다.");
+};
+const _loadSettings=loadSettings;
+loadSettings=function(){
+  _loadSettings();
+  const e=document.getElementById("aiEndpoint"); if(e)e.value=aiEndpoint();
+};
+async function generateAI(){
+  const status=document.getElementById("aiStatus");
+  const endpoint=aiEndpoint();
+  makePrompt();
+  if(!endpoint){status.textContent="AI 서버 연결이 필요합니다. 설정에서 AI 서버 주소를 입력해주세요.";document.querySelector('[data-p="settings"]').click();return}
+  const prompt=document.getElementById("aiPrompt").value;
+  if(!prompt)return;
+  status.textContent="AI가 글을 작성하고 있습니다…";
+  try{
+    const res=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt,project:document.getElementById("project").value,topic:document.getElementById("topic").value,verification:db.verify})});
+    if(!res.ok)throw new Error("HTTP "+res.status);
+    const data=await res.json();
+    document.getElementById("title").value=data.title||"";
+    document.getElementById("thumb").value=data.thumbnail||data.thumb||"";
+    document.getElementById("tags").value=Array.isArray(data.hashtags)?data.hashtags.join(" "):(data.hashtags||data.tags||"");
+    document.getElementById("content").value=data.content||data.body||"";
+    status.textContent="AI 초안 생성 완료. 내용을 검토한 뒤 저장해주세요.";
+  }catch(e){status.textContent="AI 생성 실패: "+e.message+" — 서버 연결 설정을 확인해주세요."}
+}
+loadSettings();
