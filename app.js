@@ -348,3 +348,28 @@ async function copyWorkPackage(){
  try{await navigator.clipboard.writeText(ta.value); alert("Work 작업지시서를 복사했습니다.");}
  catch(e){ta.select(); document.execCommand("copy");}
 }
+
+function queueEndpoint(){return aiEndpoint().replace(/\/api\/generate\/?$/,"/api/queue")}
+function currentQueuePayload(){
+ const val=id=>document.getElementById(id)?.value||"";
+ return {title:val("title"),content:val("content"),category:val("project"),hashtags:val("tags"),thumbnail:val("thumb"),sourcePrompt:val("aiPrompt"),status:"게시 대기",createdAt:new Date().toISOString()};
+}
+async function sendCurrentToQueue(){
+ const st=document.getElementById("queueSaveStatus"),p=currentQueuePayload();
+ if(!p.title||!p.content){st.textContent="먼저 제목과 본문을 완성해 주세요.";return}
+ st.textContent="공용 대기열에 저장 중…";
+ try{const r=await fetch(queueEndpoint(),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(p)});const d=await r.json();if(!r.ok)throw new Error(d.error||"저장 실패");st.textContent="✓ Work와 공유되는 게시 대기에 등록했습니다.";loadQueue();}
+ catch(e){st.textContent="저장 실패: "+e.message}
+}
+async function loadQueue(){
+ const box=document.getElementById("queueList"); if(!box)return; box.innerHTML='<div class="card muted">공용 대기열을 불러오는 중…</div>';
+ try{const r=await fetch(queueEndpoint());const d=await r.json();if(!r.ok)throw new Error(d.error||"불러오기 실패");const items=d.items||[];
+ box.innerHTML=items.length?items.map(x=>'<div class="card"><div class="muted">'+esc(x.status||"게시 대기")+' · '+esc((x.createdAt||"").replace("T"," ").slice(0,16))+'</div><h3>'+esc(x.title||"제목 없음")+'</h3><p>'+esc((x.content||"").slice(0,180))+(x.content?.length>180?"…":"")+'</p><div class="muted">카테고리: '+esc(x.category||"")+' · '+esc(x.hashtags||"")+'</div><button class="btn primary" style="margin-top:10px" onclick="openQueueItem(\''+x.id+'\')">내용 열기</button></div>').join(""):'<div class="card muted">현재 게시 대기 콘텐츠가 없습니다.</div>';
+ window.sharedQueue=items;
+ }catch(e){box.innerHTML='<div class="card">대기열 불러오기 실패: '+esc(e.message)+'</div>'}
+}
+function openQueueItem(id){
+ const x=(window.sharedQueue||[]).find(v=>v.id===id);if(!x)return;
+ ["title","content","project","tags","thumb","aiPrompt"].forEach(k=>{const map={project:"category",tags:"hashtags",thumb:"thumbnail",aiPrompt:"sourcePrompt"};const el=document.getElementById(k);if(el)el.value=x[map[k]||k]||""});
+ document.querySelector('[data-p="today"]').click();
+}
