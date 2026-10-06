@@ -131,7 +131,13 @@ async function rebuildImagePlan(){
   const prompt="이미 작성된 아래 네이버 블로그 원고는 문장을 다시 쓰지 말고, 동일한 제목과 본문을 그대로 반환하세요. 이 원고에 맞는 이미지 계획을 정확히 4개(썸네일 1, 본문 3) 만들고, 본문에 명시된 공개 참고자료를 sources로 구조화하세요. 출처의 날짜나 URL이 원고에 없으면 절대 추측하지 말고 빈 문자열로 두고 status를 '보완 필요'로 표시하세요.\n\n제목: "+title+"\n\n본문:\n"+body;
   const r=await fetch(aiEndpoint(),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt,project:document.getElementById("project").value,topic:title})});
   const d=await r.json();if(!r.ok)throw new Error(d.error||("HTTP "+r.status));
-  imagePlan=Array.isArray(d.images)?d.images:[];window.currentSources=Array.isArray(d.sources)?d.sources:[];preparedPackage=null;renderImageCards();
+  imagePlan=Array.isArray(d.images)?d.images:[];
+  const prior=Array.isArray(window.currentSources)?window.currentSources:[];
+  window.currentSources=(Array.isArray(d.sources)?d.sources:[]).map(s=>{
+    const hit=prior.find(p=>(p.url&&((p.title&&s.title&&p.title===s.title)||(p.source&&s.source&&p.source===s.source))));
+    return hit?{...s,...hit,status:(hit.source&&hit.title&&hit.date&&hit.url)?"완료":(s.status||"보완 필요")}:s;
+  });
+  preparedPackage=null;renderImageCards();
   const missing=window.currentSources.filter(s=>s.status!=="완료"||!s.url||!s.date).length;
   st.textContent="복구 완료: 이미지 계획 "+imagePlan.length+"개 · 출처 "+window.currentSources.length+"건"+(missing?" (보완 필요 "+missing+"건)":"");
  }catch(e){st.textContent="이미지 계획 복구 실패: "+e.message}
@@ -165,22 +171,14 @@ let preparedPackage=null;
 function isThumbnail(x,i){return i===0||/썸네일|대표/.test(String(x?.role||""))}
 function bodyImagePlans(){return imagePlan.filter((x,i)=>!isThumbnail(x,i)).slice(0,3)}
 function placeImageMarkers(text){
-  const clean=String(text||"").replace(/\n*\[이미지\s*[1-3]\s*삽입\]\n*/g,"\n\n");
+  const clean=String(text||"")
+    .replace(/\n*\[이미지\s*[1-3]\s*삽입\]\n*(?:※[^\n]*\n*)?/g,"\n\n")
+    .replace(/\n*※\s*[^\n]*(?:이미지|장면)[^\n]*\n*/g,"\n\n");
   const paras=clean.split(/\n\s*\n/).map(x=>x.trim()).filter(Boolean);
-  if(paras.length<4){
-    let out=clean.trim();
-    bodyImagePlans().forEach((x,i)=>{out+="\n\n[이미지 "+(i+1)+" 삽입]\n"+(x.caption?("※ "+x.caption):"")});
-    return out;
-  }
-  const count=bodyImagePlans().length;
-  const slots=[];
-  for(let i=1;i<=count;i++) slots.push(Math.max(1,Math.min(paras.length-1,Math.round(paras.length*i/(count+1)))));
-  let offset=0;
-  slots.forEach((pos,i)=>{
-    const x=bodyImagePlans()[i];
-    paras.splice(pos+offset,0,"[이미지 "+(i+1)+" 삽입]"+(x?.caption?"\n※ "+x.caption:""));
-    offset++;
-  });
+  const plans=bodyImagePlans(),count=plans.length;
+  if(paras.length<4){let out=clean.trim();plans.forEach((x,i)=>{out+="\n\n[이미지 "+(i+1)+" 삽입]"});return out}
+  const slots=[];for(let i=1;i<=count;i++)slots.push(Math.max(1,Math.min(paras.length-1,Math.round(paras.length*i/(count+1)))));
+  let offset=0;slots.forEach((pos,i)=>{paras.splice(pos+offset,0,"[이미지 "+(i+1)+" 삽입]");offset++});
   return paras.join("\n\n");
 }
 async function prepareNaver(){
@@ -365,9 +363,9 @@ function buildWorkPackage(x){
  ta.value="BLOG FACTORY → NAVER BLOG WORK 작업지시\n\n"+
  "BLOG FACTORY에서 현재 완성된 글의 최종 제목, 본문, 이미지, 해시태그, 출처를 확인한다.\n"+
  "네이버 블로그 새 글쓰기를 열고 지정 카테고리를 선택한다.\n"+
- "제목과 본문을 옮기고 이미지가 준비되어 있으면 지정 위치에 배치한다.\n"+
+ "제목과 본문을 옮기고 대표 이미지는 상단, 본문 이미지 1~3은 [이미지 1~3 삽입] 위치에 배치한다. 이미지 설명은 같은 문장을 본문에 중복 삽입하지 말고 필요할 때만 짧고 자연스러운 캡션으로 처리한다.\n"+
  "임의로 새로운 사실이나 수치를 추가하지 않는다. 해외 원문을 장문 복제하지 않는다.\n"+
- "원문 매체명·날짜·링크와 해시태그를 유지한다. 기존 게시글은 수정·삭제하지 않는다.\n"+
+ "원문 매체명·날짜·링크와 해시태그를 유지한다. 출처 URL이나 날짜가 비어 있으면 임의 생성하지 않고 보완 필요로 둔다. 기존 게시글은 수정·삭제하지 않는다.\n"+
  "최종 발행 버튼은 누르지 말고 발행 직전 사용자 확인을 요청한다.\n\n"+
  "선택 뉴스\n제목: "+(x?.title||"")+"\n매체: "+(x?.source||"")+"\n날짜: "+(x?.date||"")+"\n원문: "+(x?.url||"")+"\n\n"+
  "BLOG FACTORY: https://miraclelife77-cmd.github.io/blog-factory/";
