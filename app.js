@@ -100,6 +100,8 @@ async function generateAI(){
     document.getElementById("thumb").value=data.thumbnail||data.thumb||"";
     document.getElementById("tags").value=Array.isArray(data.hashtags)?data.hashtags.map(t=>{t=String(t).trim();return t?(t.startsWith("#")?t:"#"+t):""}).filter(Boolean).join(" "):String(data.hashtags||data.tags||"").split(/\\s+/).filter(Boolean).map(t=>t.startsWith("#")?t:"#"+t).join(" ");
     document.getElementById("content").value=data.content||data.body||"";
+    window.currentSources=Array.isArray(forcedSources)?forcedSources:(Array.isArray(data.sources)?data.sources:[]);
+    preparedPackage=null;
     imagePlan=Array.isArray(data.images)?data.images:[]; renderImageCards();
     status.textContent="게시용 원고 생성 완료. 본문을 검토하고 이미지를 생성해주세요.";
   }catch(e){status.textContent="AI 생성 실패: "+e.message+" — 서버 연결 설정을 확인해주세요."}
@@ -117,9 +119,22 @@ function renderImageCards(){
       <b>${esc(x.role||("이미지 "+(i+1)))}</b>
       <div class="muted" style="margin:6px 0">${esc(x.caption||"")}</div>
       <div id="imgStatus${i}" class="muted"></div>
-      <div id="imgBox${i}" style="margin-top:8px"></div>
+      <div id="imgBox${i}" style="margin-top:8px">${x.dataUrl?'<img src="'+esc(x.dataUrl)+'" style="width:100%;max-height:360px;object-fit:cover;border-radius:10px">':""}</div>
       <div class="actions"><button class="btn" onclick="generateImage(${i})">AI 이미지 생성</button><label class="btn" style="display:inline-block;margin:0">실제 사진으로 교체<input type="file" accept="image/*" hidden onchange="useRealPhoto(${i},this)"></label></div>
     </div>`).join("");
+}
+async function rebuildImagePlan(){
+ const st=document.getElementById("prepareStatus"),title=document.getElementById("title").value.trim(),body=document.getElementById("content").value.trim();
+ if(!body){st.textContent="현재 본문이 없습니다.";return}
+ st.textContent="현재 글에서 이미지 계획 4개와 출처 후보를 복구하고 있습니다…";
+ try{
+  const prompt="이미 작성된 아래 네이버 블로그 원고는 문장을 다시 쓰지 말고, 동일한 제목과 본문을 그대로 반환하세요. 이 원고에 맞는 이미지 계획을 정확히 4개(썸네일 1, 본문 3) 만들고, 본문에 명시된 공개 참고자료를 sources로 구조화하세요. 출처의 날짜나 URL이 원고에 없으면 절대 추측하지 말고 빈 문자열로 두고 status를 '보완 필요'로 표시하세요.\n\n제목: "+title+"\n\n본문:\n"+body;
+  const r=await fetch(aiEndpoint(),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt,project:document.getElementById("project").value,topic:title})});
+  const d=await r.json();if(!r.ok)throw new Error(d.error||("HTTP "+r.status));
+  imagePlan=Array.isArray(d.images)?d.images:[];window.currentSources=Array.isArray(d.sources)?d.sources:[];preparedPackage=null;renderImageCards();
+  const missing=window.currentSources.filter(s=>s.status!=="완료"||!s.url||!s.date).length;
+  st.textContent="복구 완료: 이미지 계획 "+imagePlan.length+"개 · 출처 "+window.currentSources.length+"건"+(missing?" (보완 필요 "+missing+"건)":"");
+ }catch(e){st.textContent="이미지 계획 복구 실패: "+e.message}
 }
 async function generateImage(i){
   const x=imagePlan[i], st=document.getElementById("imgStatus"+i), box=document.getElementById("imgBox"+i);
@@ -274,7 +289,7 @@ function chatToArticle(){
   document.querySelector('[data-p="today"]').click();
   generateAIFromPrompt();
 }
-async function generateAIFromPrompt(){
+async function generateAIFromPrompt(forcedSources=null){
   const status=document.getElementById("aiStatus"),endpoint=aiEndpoint(),prompt=document.getElementById("aiPrompt").value; if(!prompt)return;
   status.textContent="AI 작업실 대화를 게시용 글로 만들고 있습니다…";
   try{
@@ -284,6 +299,8 @@ async function generateAIFromPrompt(){
     document.getElementById("thumb").value=data.thumbnail||"";
     document.getElementById("tags").value=(data.hashtags||[]).map(t=>String(t).startsWith("#")?t:"#"+t).join(" ");
     document.getElementById("content").value=data.content||"";
+    window.currentSources=Array.isArray(data.sources)?data.sources:[];
+    preparedPackage=null;
     imagePlan=Array.isArray(data.images)?data.images:[]; renderImageCards();
     status.textContent="AI 작업실 대화로 게시용 원고를 만들었습니다.";
   }catch(e){status.textContent="글 생성 실패: "+e.message}
@@ -340,7 +357,7 @@ function briefingToArticle(i){
   document.getElementById("project").value=x.category&&/탄소|배출권|에너지|재활용|친환경/.test(x.category)?"환경과 탄소":"새로운 사업 탐구";
   document.getElementById("topic").value=x.title||"글로벌 브리핑";
   document.getElementById("aiPrompt").value="다음 최신 뉴스 브리핑을 바탕으로 한국 독자를 위한 네이버 블로그 글을 작성해 주세요. 원문을 장문 번역하거나 복제하지 말고 사실을 요약·해설하고 어려운 개념을 쉽게 설명하세요. 원문 매체·날짜·링크를 글 마지막에 출처로 명시하고, 확인되지 않은 추론은 사실처럼 단정하지 마세요.\n\n제목: "+(x.title||"")+"\n매체: "+(x.source||"")+"\n날짜: "+(x.date||"")+"\n핵심요약: "+(x.summary||"")+"\n중요성: "+(x.why||"")+"\n한국과의 연결: "+(x.korea||"")+"\n원문: "+(x.url||"");
-  document.querySelector('[data-p="today"]').click(); generateAIFromPrompt(); buildWorkPackage(x);
+  document.querySelector('[data-p="today"]').click(); generateAIFromPrompt([{title:x.title||"",source:x.source||"",date:x.date||"",url:x.url||"",status:(x.source&&x.title&&x.date&&x.url)?"완료":"보완 필요"}]); buildWorkPackage(x);
 }
 
 function buildWorkPackage(x){
@@ -374,7 +391,7 @@ async function sendCurrentToQueue(){
  if(!p.title||!p.content){st.textContent="먼저 제목과 본문을 완성해 주세요.";return}
  const mentionsExternal=/https?:\/\/|IEA|국제에너지기구|Reuters|Bloomberg|로이터|정부|보고서|뉴스|기사/.test(p.content+" "+p.sourcePrompt);
  if(mentionsExternal&&!p.sources.length){st.textContent="출처가 필요한 글입니다. 글로벌 브리핑에서 원문을 선택하거나 출처 정보를 먼저 연결해 주세요.";return}
- if((imagePlan||[]).length&&p.images.some(x=>!x.dataUrl)){st.textContent="이미지 계획이 있습니다. 이미지 4장을 먼저 생성한 뒤 등록해 주세요.";return}
+ if(p.images.length!==4){st.textContent="완성 패키지는 이미지 4장이 필요합니다. ‘네이버 게시 준비’를 먼저 실행해 주세요.";return}
  st.textContent="출처와 이미지를 포함해 공용 대기열에 저장 중…";
  try{
    const r=await fetch(queueEndpoint(),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(p)});
@@ -389,7 +406,7 @@ function queueDetailsHtml(x){
  const sources=(x.sources||[]);
  const images=(x.images||[]);
  let h='<div class="muted">출처 '+sources.length+'건 · 이미지 '+images.length+'장</div>';
- if(sources.length)h+='<div style="margin-top:10px"><b>출처</b>'+sources.map(v=>'<div style="margin-top:6px">'+esc([v.source,v.title,v.date].filter(Boolean).join(" · "))+(v.url?'<br><a target="_blank" rel="noopener" href="'+esc(v.url)+'">'+esc(v.url)+'</a>':"")+'</div>').join("")+'</div>';
+ if(sources.length)h+='<div style="margin-top:10px"><b>출처</b>'+sources.map(v=>'<div style="margin-top:6px">'+esc([v.source,v.title,v.date,v.status].filter(Boolean).join(" · "))+(v.url?'<br><a target="_blank" rel="noopener" href="'+esc(v.url)+'">'+esc(v.url)+'</a>':"")+'</div>').join("")+'</div>';
  if(images.length)h+='<div style="margin-top:12px"><b>공유 이미지</b><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-top:8px">'+images.map((im,k)=>'<div><div class="muted">'+esc(im.role||(k===0?"대표 이미지":"본문 이미지 "+k))+'</div><img src="'+queueEndpoint()+'?asset='+encodeURIComponent(im.pathname||"")+'" style="width:100%;max-height:220px;object-fit:cover;border-radius:8px;margin-top:5px" alt="'+esc(im.caption||im.role||"블로그 이미지")+'"></div>').join("")+'</div></div>';
  return h;
 }
