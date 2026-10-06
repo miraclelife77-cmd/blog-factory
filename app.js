@@ -11,3 +11,60 @@ function saveArchive(){db.archive=document.getElementById("archiveText").value;p
 function saveSettings(){db.settings={blogId:document.getElementById("blogId").value,identity:document.getElementById("identity").value,length:document.getElementById("length").value,freq:document.getElementById("freq").value};persist();alert("저장했습니다.")}function loadSettings(){document.getElementById("blogId").value=db.settings.blogId;document.getElementById("identity").value=db.settings.identity;document.getElementById("length").value=db.settings.length;document.getElementById("freq").value=db.settings.freq}
 function exportData(){let b=new Blob([JSON.stringify(db,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="blog-factory-backup.json";a.click();URL.revokeObjectURL(a.href)}function importData(el){let f=el.files[0];if(!f)return;let r=new FileReader();r.onload=function(){try{db=JSON.parse(r.result);persist();location.reload()}catch(e){alert("올바른 백업 파일이 아닙니다.")}};r.readAsText(f)}
 function render(){renderRecords();renderVerify();document.getElementById("archiveText").value=db.archive||"";document.getElementById("views").value=db.views||0;renderMetrics()}document.getElementById("project").addEventListener("change",suggest);suggest();loadSettings();render();
+
+/* BLOG FACTORY v1.2 workflow */
+let editingId=null;
+function projectSafety(){
+  const p=document.getElementById("project").value;
+  if(p==="왕대나무 프로젝트"){
+    document.getElementById("level").value="검증 중 - 출처/귀속 표현 필수";
+  }
+}
+function editRec(id){
+  const r=db.records.find(x=>x.id===id); if(!r)return;
+  editingId=id;
+  document.getElementById("project").value=r.project||"일반 / 생각과 기록";
+  document.getElementById("topic").value=r.topic||"";
+  document.getElementById("title").value=r.title||"";
+  document.getElementById("thumb").value=r.thumb||"";
+  document.getElementById("tags").value=r.tags||"";
+  document.getElementById("content").value=r.content||"";
+  document.getElementById("url").value=r.url||"";
+  projectSafety(); makePrompt();
+  document.querySelector('[data-p="today"]').click();
+}
+function savePost(pub){
+  const title=document.getElementById("title").value.trim();
+  if(!title)return alert("제목을 입력해주세요.");
+  const item={
+    date:new Date().toLocaleDateString("ko-KR"),
+    project:document.getElementById("project").value,
+    topic:document.getElementById("topic").value,
+    title,
+    thumb:document.getElementById("thumb").value,
+    tags:document.getElementById("tags").value,
+    content:document.getElementById("content").value,
+    url:document.getElementById("url").value,
+    status:pub?"게시 완료":"초안"
+  };
+  if(editingId){
+    const i=db.records.findIndex(x=>x.id===editingId);
+    if(i>=0) db.records[i]={...db.records[i],...item};
+  }else{
+    const same=db.records.find(x=>x.title===title&&x.status!=="게시 완료");
+    if(same){ Object.assign(same,item); editingId=same.id; }
+    else { item.id=Date.now(); db.records.unshift(item); editingId=item.id; }
+  }
+  persist(); render(); suggest();
+  alert(pub?"게시 완료로 기록했습니다.":"초안을 저장하고 캘린더에 등록했습니다.");
+}
+function clearEditor(){
+  editingId=null;
+  ["topic","aiPrompt","title","thumb","tags","content","url"].forEach(x=>document.getElementById(x).value="");
+  projectSafety(); suggest();
+}
+function renderRecords(){
+  const e=document.getElementById("records");
+  e.innerHTML=db.records.length?db.records.map(r=>"<tr><td>"+esc(r.date)+"</td><td>"+esc(r.project)+"</td><td>"+esc(r.title)+"</td><td>"+esc(r.status)+"</td><td><button class='btn' onclick='editRec("+r.id+")'>열기</button> <button class='btn danger' onclick='delRec("+r.id+")'>삭제</button></td></tr>").join(""):"<tr><td colspan='5' class='muted'>아직 저장된 콘텐츠가 없습니다.</td></tr>";
+}
+document.getElementById("project").addEventListener("change",function(){projectSafety();suggest();});
