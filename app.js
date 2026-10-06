@@ -381,5 +381,12 @@ async function loadQueue(){
 function openQueueItem(id){
  const x=(window.sharedQueue||[]).find(v=>v.id===id);if(!x)return;
  ["title","content","project","tags","thumb","aiPrompt"].forEach(k=>{const map={project:"category",tags:"hashtags",thumb:"thumbnail",aiPrompt:"sourcePrompt"};const el=document.getElementById(k);if(el)el.value=x[map[k]||k]||""});
+ window.currentSources=x.sources||[];
+ imagePlan=(x.images||[]).map(v=>({...v,dataUrl:v.pathname?(queueEndpoint()+"?asset="+encodeURIComponent(v.pathname)):""}));
+ renderImageCards();
+ let extra="";
+ if(window.currentSources.length)extra+="\n\n출처\n"+window.currentSources.map(s=>"• "+[s.source,s.title,s.date].filter(Boolean).join(" · ")+"\n  "+(s.url||"")).join("\n");
+ if(imagePlan.length)extra+="\n\n공유 이미지\n"+imagePlan.map((im,k)=>((k===0?"대표 이미지":"본문 이미지 "+k)+": "+queueEndpoint()+"?asset="+encodeURIComponent(im.pathname||""))).join("\n");
+ const p=document.getElementById("aiPrompt");if(p)p.value=(p.value||"")+extra;
  document.querySelector('[data-p="today"]').click();
 }
