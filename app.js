@@ -371,11 +371,23 @@ async function sendCurrentToQueue(){
    st.textContent="✓ 출처·이미지를 포함한 완성 패키지를 Work와 공유했습니다.";loadQueue();
  }catch(e){st.textContent="저장 실패: "+e.message}
 }
+function formatQueueTime(iso){
+ try{return new Intl.DateTimeFormat("ko-KR",{timeZone:"Asia/Seoul",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hour12:false}).format(new Date(iso));}catch{return String(iso||"")}
+}
+function queueDetailsHtml(x){
+ const sources=(x.sources||[]);
+ const images=(x.images||[]);
+ let h='<div class="muted">출처 '+sources.length+'건 · 이미지 '+images.length+'장</div>';
+ if(sources.length)h+='<div style="margin-top:10px"><b>출처</b>'+sources.map(v=>'<div style="margin-top:6px">'+esc([v.source,v.title,v.date].filter(Boolean).join(" · "))+(v.url?'<br><a target="_blank" rel="noopener" href="'+esc(v.url)+'">'+esc(v.url)+'</a>':"")+'</div>').join("")+'</div>';
+ if(images.length)h+='<div style="margin-top:12px"><b>공유 이미지</b><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-top:8px">'+images.map((im,k)=>'<div><div class="muted">'+esc(im.role||(k===0?"대표 이미지":"본문 이미지 "+k))+'</div><img src="'+queueEndpoint()+'?asset='+encodeURIComponent(im.pathname||"")+'" style="width:100%;max-height:220px;object-fit:cover;border-radius:8px;margin-top:5px" alt="'+esc(im.caption||im.role||"블로그 이미지")+'"></div>').join("")+'</div></div>';
+ return h;
+}
 async function loadQueue(){
  const box=document.getElementById("queueList"); if(!box)return; box.innerHTML='<div class="card muted">공용 대기열을 불러오는 중…</div>';
- try{const r=await fetch(queueEndpoint());const d=await r.json();if(!r.ok)throw new Error(d.error||"불러오기 실패");const items=d.items||[];
- box.innerHTML=items.length?items.map(x=>'<div class="card"><div class="muted">'+esc(x.status||"게시 대기")+' · '+esc((x.createdAt||"").replace("T"," ").slice(0,16))+'</div><h3>'+esc(x.title||"제목 없음")+'</h3><p>'+esc((x.content||"").slice(0,180))+(x.content?.length>180?"…":"")+'</p><div class="muted">카테고리: '+esc(x.category||"")+' · '+esc(x.hashtags||"")+'</div><button class="btn primary" style="margin-top:10px" onclick="openQueueItem(\''+x.id+'\')">내용 열기</button></div>').join(""):'<div class="card muted">현재 게시 대기 콘텐츠가 없습니다.</div>';
- window.sharedQueue=items;
+ try{
+  const r=await fetch(queueEndpoint());const d=await r.json();if(!r.ok)throw new Error(d.error||"불러오기 실패");const items=d.items||[];
+  box.innerHTML=items.length?items.map(x=>'<div class="card"><div class="muted">'+esc(x.status||"게시 대기")+' · '+esc(formatQueueTime(x.createdAt))+' (한국시간)</div><h3>'+esc(x.title||"제목 없음")+'</h3><p>'+esc((x.content||"").slice(0,180))+(x.content?.length>180?"…":"")+'</p><div class="muted">카테고리: '+esc(x.category||"")+' · '+esc(x.hashtags||"")+'</div>'+queueDetailsHtml(x)+'<button class="btn primary" style="margin-top:10px" onclick="openQueueItem(\''+x.id+'\')">내용 열기</button></div>').join(""):'<div class="card muted">현재 게시 대기 콘텐츠가 없습니다.</div>';
+  window.sharedQueue=items;
  }catch(e){box.innerHTML='<div class="card">대기열 불러오기 실패: '+esc(e.message)+'</div>'}
 }
 function openQueueItem(id){
