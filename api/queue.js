@@ -22,7 +22,7 @@ export default async function handler(req,res){
    const id=Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,8);
    const sources=(Array.isArray(b.sources)?b.sources:[]).slice(0,10).map(x=>({title:String(x.title||"").slice(0,500),source:String(x.source||"").slice(0,200),date:String(x.date||"").slice(0,50),url:String(x.url||"").slice(0,2000)}));
    const images=[];
-   for(let i=0;i<(Array.isArray(b.images)?b.images:[]).slice(0,4).length;i++){const saved=await saveImage(id,b.images[i],i);if(saved)images.push(saved)}
+   for(let i=0;i<(Array.isArray(b.images)?b.images:[]).slice(0,4).length;i++){const raw=b.images[i];if(raw?.pathname){images.push({pathname:String(raw.pathname),role:String(raw.role||""),caption:String(raw.caption||""),sourceType:String(raw.sourceType||"ai")});continue}const saved=await saveImage(id,raw,i);if(saved)images.push(saved)}
    const item={id,title:String(b.title).slice(0,300),content:String(b.content).slice(0,30000),category:String(b.category||""),hashtags:String(b.hashtags||""),thumbnail:String(b.thumbnail||""),sourcePrompt:String(b.sourcePrompt||"").slice(0,10000),sources,images,status:"게시 대기",createdAt:b.createdAt||new Date().toISOString()};
    await put("queue/"+id+".json",JSON.stringify(item),{access:"private",contentType:"application/json",addRandomSuffix:false});
    return res.status(200).json({ok:true,id,sources:sources.length,images:images.length});
