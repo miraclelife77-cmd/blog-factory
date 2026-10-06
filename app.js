@@ -70,7 +70,7 @@ function renderRecords(){
 document.getElementById("project").addEventListener("change",function(){projectSafety();suggest();});
 
 /* BLOG FACTORY v1.5 AI bridge */
-function aiEndpoint(){return (db.settings&&db.settings.aiEndpoint)||"https://blog-factory-omega.vercel.app/api/generate"}
+function aiEndpoint(){const v=(db.settings&&db.settings.aiEndpoint||"").trim();return (!v||/blog-factory-omega\\.vercel\\.app/.test(v))?"https://blog-factory-omega.vercel.app/api/generate":v}
 const _saveSettings=saveSettings;
 saveSettings=function(){
   db.settings={blogId:document.getElementById("blogId").value,identity:document.getElementById("identity").value,length:document.getElementById("length").value,freq:document.getElementById("freq").value,aiEndpoint:document.getElementById("aiEndpoint").value.trim()};
@@ -84,10 +84,12 @@ loadSettings=function(){
 async function generateAI(){
   const status=document.getElementById("aiStatus");
   const endpoint=aiEndpoint();
+  const topic=document.getElementById("topic").value.trim();
+  if(!topic){status.textContent="주제를 먼저 입력하거나 위의 주제 후보를 선택해주세요.";return}
   makePrompt();
   if(!endpoint){status.textContent="AI 서버 연결이 필요합니다. 설정에서 AI 서버 주소를 입력해주세요.";document.querySelector('[data-p="settings"]').click();return}
   const prompt=document.getElementById("aiPrompt").value;
-  if(!prompt)return;
+  if(!prompt){status.textContent="AI 작성 프롬프트를 만들지 못했습니다.";return}
   status.textContent="AI가 글을 작성하고 있습니다…";
   try{
     const res=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt,project:document.getElementById("project").value,topic:document.getElementById("topic").value,verification:db.verify})});
