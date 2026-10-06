@@ -188,9 +188,41 @@ function dataUrlToBlob(dataUrl){
 async function downloadAllImages(){
   const ready=imagePlan.filter(x=>x.dataUrl);
   if(ready.length!==imagePlan.length)return alert("이미지 4장을 먼저 생성해주세요.");
-  ready.forEach((x,i)=>setTimeout(()=>{
-    const a=document.createElement("a"); a.href=URL.createObjectURL(dataUrlToBlob(x.dataUrl));
-    a.download=i===0?"00-thumbnail.png":("0"+i+"-body-image-"+i+".png"); a.click();
-    setTimeout(()=>URL.revokeObjectURL(a.href),2000);
-  },i*350));
+  /* Browsers commonly block multiple programmatic downloads after the first click.
+     Package all four generated images into one ZIP so one user gesture downloads everything. */
+  try{
+    const files=ready.map((x,i)=>({
+      name:i===0?"00-thumbnail.png":("0"+i+"-body-image-"+i+".png"),
+      bytes:dataUrlToBytes(x.dataUrl)
+    }));
+    const zip=makeStoreZip(files);
+    const url=URL.createObjectURL(zip);
+    const a=document.createElement("a"); a.href=url; a.download="naver-blog-images.zip";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),3000);
+  }catch(e){alert("이미지 일괄저장 실패: "+e.message)}
+}
+function dataUrlToBytes(dataUrl){
+  const data=dataUrl.split(",")[1],bin=atob(data),out=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++)out[i]=bin.charCodeAt(i); return out;
+}
+function crc32(bytes){
+  let c=0xffffffff;
+  for(const b of bytes){c^=b;for(let k=0;k<8;k++)c=(c>>>1)^((c&1)?0xedb88320:0)}
+  return (c^0xffffffff)>>>0;
+}
+function u16(n){return [n&255,(n>>>8)&255]}
+function u32(n){return [n&255,(n>>>8)&255,(n>>>16)&255,(n>>>24)&255]}
+function makeStoreZip(files){
+  const enc=new TextEncoder(),locals=[],centrals=[]; let offset=0;
+  for(const f of files){
+    const name=enc.encode(f.name),data=f.bytes,crc=crc32(data);
+    const local=new Uint8Array([80,75,3,4,20,0,0,0,0,0,0,0,0,0,...u32(crc),...u32(data.length),...u32(data.length),...u16(name.length),0,0,...name,...data]);
+    locals.push(local);
+    const central=new Uint8Array([80,75,1,2,20,0,20,0,0,0,0,0,0,0,0,0,...u32(crc),...u32(data.length),...u32(data.length),...u16(name.length),0,0,0,0,0,0,0,0,0,0,0,0,...u32(offset),...name]);
+    centrals.push(central); offset+=local.length;
+  }
+  const centralSize=centrals.reduce((n,x)=>n+x.length,0),count=files.length;
+  const end=new Uint8Array([80,75,5,6,0,0,0,0,...u16(count),...u16(count),...u32(centralSize),...u32(offset),0,0]);
+  return new Blob([...locals,...centrals,end],{type:"application/zip"});
 }
