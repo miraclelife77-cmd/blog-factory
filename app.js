@@ -83,28 +83,29 @@ loadSettings=function(){
   const e=document.getElementById("aiEndpoint"); if(e)e.value=aiEndpoint();
 };
 async function generateAI(){
-  const status=document.getElementById("aiStatus");
-  const endpoint=aiEndpoint();
-  const topic=document.getElementById("topic").value.trim();
-  if(!topic){status.textContent="주제를 먼저 입력하거나 위의 주제 후보를 선택해주세요.";return}
-  makePrompt();
-  if(!endpoint){status.textContent="AI 서버 연결이 필요합니다. 설정에서 AI 서버 주소를 입력해주세요.";document.querySelector('[data-p="settings"]').click();return}
-  const prompt=document.getElementById("aiPrompt").value;
-  if(!prompt){status.textContent="AI 작성 프롬프트를 만들지 못했습니다.";return}
-  status.textContent="AI가 글을 작성하고 있습니다…";
+  const status=document.getElementById("aiStatus"),endpoint=aiEndpoint(),topic=document.getElementById("topic").value.trim();
+  if(!topic){status.textContent="주제를 직접 입력하거나 위의 주제 후보를 선택해주세요.";return}
+  makePrompt(); if(!endpoint){status.textContent="AI 서버 연결이 필요합니다.";return}
   try{
-    const res=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt,project:document.getElementById("project").value,topic:document.getElementById("topic").value,verification:db.verify})});
-    if(!res.ok)throw new Error("HTTP "+res.status);
-    const data=await res.json();
+    status.textContent="공개 자료를 조사하고 출처를 확인하고 있습니다…";
+    const researchUrl=endpoint.replace(/\/api\/generate\/?$/,"/api/research");
+    const rr=await fetch(researchUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({topic,project:document.getElementById("project").value})});
+    const rd=await rr.json();if(!rr.ok)throw new Error(rd.error||("자료조사 HTTP "+rr.status));
+    window.currentSources=Array.isArray(rd.sources)?rd.sources:[];
+    const evidence=(rd.summary||"")+"\n\n확인된 공개 출처:\n"+window.currentSources.map((s,i)=>(i+1)+". "+[s.source,s.title,s.date,s.url].filter(Boolean).join(" | ")).join("\n");
+    const prompt=document.getElementById("aiPrompt").value+"\n\n[공개 자료 조사 결과]\n"+evidence+"\n\n위 조사 결과에 없는 구체적 사실·수치·링크는 만들어내지 마세요. 출처는 위 목록을 우선 사용하세요.";
+    status.textContent="자료조사 완료. 출처를 근거로 글을 작성하고 있습니다…";
+    const res=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt,project:document.getElementById("project").value,topic,verification:db.verify})});
+    const data=await res.json();if(!res.ok)throw new Error(data.error||("글 생성 HTTP "+res.status));
     document.getElementById("title").value=data.title||"";
     document.getElementById("thumb").value=data.thumbnail||data.thumb||"";
-    document.getElementById("tags").value=Array.isArray(data.hashtags)?data.hashtags.map(t=>{t=String(t).trim();return t?(t.startsWith("#")?t:"#"+t):""}).filter(Boolean).join(" "):String(data.hashtags||data.tags||"").split(/\\s+/).filter(Boolean).map(t=>t.startsWith("#")?t:"#"+t).join(" ");
+    document.getElementById("tags").value=Array.isArray(data.hashtags)?data.hashtags.map(t=>{t=String(t).trim();return t?(t.startsWith("#")?t:"#"+t):""}).filter(Boolean).join(" "):"";
     document.getElementById("content").value=data.content||data.body||"";
-    window.currentSources=Array.isArray(forcedSources)?forcedSources:(Array.isArray(data.sources)?data.sources:[]);
-    preparedPackage=null;
-    imagePlan=Array.isArray(data.images)?data.images:[]; renderImageCards();
-    status.textContent="게시용 원고 생성 완료. 본문을 검토하고 이미지를 생성해주세요.";
-  }catch(e){status.textContent="AI 생성 실패: "+e.message+" — 서버 연결 설정을 확인해주세요."}
+    if(!window.currentSources.length)window.currentSources=Array.isArray(data.sources)?data.sources:[];
+    preparedPackage=null;imagePlan=Array.isArray(data.images)?data.images:[];renderImageCards();
+    const complete=window.currentSources.filter(s=>s.url).length;
+    status.textContent="자료조사 + 게시용 원고 완료 · 출처 "+complete+"건 연결. 본문을 검토한 뒤 네이버 게시 준비를 눌러주세요.";
+  }catch(e){status.textContent="자료조사/글 생성 실패: "+e.message}
 }
 loadSettings();
 
