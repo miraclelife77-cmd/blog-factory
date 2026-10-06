@@ -12,7 +12,13 @@ export default async function handler(req,res){
  cors(res); if(req.method==="OPTIONS")return res.status(204).end();
  try{
   if(req.method==="POST"){
-   const b=req.body||{}; if(!b.title||!b.content)return res.status(400).json({error:"제목과 본문이 필요합니다."});
+   const b=req.body||{};
+   if(b.action==="upload-image"){
+    const id=String(b.packageId||"").replace(/[^a-zA-Z0-9_-]/g,"").slice(0,80); if(!id)return res.status(400).json({error:"packageId required"});
+    const saved=await saveImage(id,{dataUrl:b.dataUrl,role:b.role,caption:b.caption,sourceType:b.sourceType},Number(b.index)||0);
+    if(!saved)return res.status(400).json({error:"이미지 데이터가 올바르지 않습니다."});
+    return res.status(200).json({ok:true,image:saved});
+   } if(!b.title||!b.content)return res.status(400).json({error:"제목과 본문이 필요합니다."});
    const id=Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,8);
    const sources=(Array.isArray(b.sources)?b.sources:[]).slice(0,10).map(x=>({title:String(x.title||"").slice(0,500),source:String(x.source||"").slice(0,200),date:String(x.date||"").slice(0,50),url:String(x.url||"").slice(0,2000)}));
    const images=[];
