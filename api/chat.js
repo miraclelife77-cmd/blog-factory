@@ -11,7 +11,7 @@ export default async function handler(req,res){
   try{
     const input=[
       {role:"system",content:[{type:"input_text",text:"You are BLOG FACTORY AI 작업실. Converse naturally in Korean and help the user explore a very broad range of possible blog topics. Do not force every conversation into a predefined category. Ask or suggest useful angles when needed. Keep replies compact enough for an ideation chat. Never reveal or invent confidential business facts. Blog identity: "+identity}]},
-      ...messages.map(m=>({role:m.role==="assistant"?"assistant":"user",content:[{type:"input_text",text:String(m.text||"")}]}))
+      ...messages.map(m=>{const role=m.role==="assistant"?"assistant":"user";return {role,content:[{type:role==="assistant"?"output_text":"input_text",text:String(m.text||"")}]}})
     ];
     const r=await fetch("https://api.openai.com/v1/responses",{method:"POST",headers:{"Authorization":"Bearer "+process.env.OPENAI_API_KEY,"Content-Type":"application/json"},body:JSON.stringify({model:"gpt-5.6-luna",reasoning:{effort:"low"},input})});
     const d=await r.json(); if(!r.ok)return res.status(r.status).json({error:d?.error?.message||"OpenAI request failed"});
