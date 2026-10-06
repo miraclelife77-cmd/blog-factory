@@ -327,5 +327,24 @@ function briefingToArticle(i){
   document.getElementById("project").value=x.category&&/탄소|배출권|에너지|재활용|친환경/.test(x.category)?"환경과 탄소":"새로운 사업 탐구";
   document.getElementById("topic").value=x.title||"글로벌 브리핑";
   document.getElementById("aiPrompt").value="다음 최신 뉴스 브리핑을 바탕으로 한국 독자를 위한 네이버 블로그 글을 작성해 주세요. 원문을 장문 번역하거나 복제하지 말고 사실을 요약·해설하고 어려운 개념을 쉽게 설명하세요. 원문 매체·날짜·링크를 글 마지막에 출처로 명시하고, 확인되지 않은 추론은 사실처럼 단정하지 마세요.\n\n제목: "+(x.title||"")+"\n매체: "+(x.source||"")+"\n날짜: "+(x.date||"")+"\n핵심요약: "+(x.summary||"")+"\n중요성: "+(x.why||"")+"\n한국과의 연결: "+(x.korea||"")+"\n원문: "+(x.url||"");
-  document.querySelector('[data-p="today"]').click(); generateAIFromPrompt();
+  document.querySelector('[data-p="today"]').click(); generateAIFromPrompt(); buildWorkPackage(x);
+}
+
+function buildWorkPackage(x){
+ const box=document.getElementById("workPack"),ta=document.getElementById("workPackageText"); if(!box||!ta)return;
+ ta.value="BLOG FACTORY → NAVER BLOG WORK 작업지시\n\n"+
+ "BLOG FACTORY에서 현재 완성된 글의 최종 제목, 본문, 이미지, 해시태그, 출처를 확인한다.\n"+
+ "네이버 블로그 새 글쓰기를 열고 지정 카테고리를 선택한다.\n"+
+ "제목과 본문을 옮기고 이미지가 준비되어 있으면 지정 위치에 배치한다.\n"+
+ "임의로 새로운 사실이나 수치를 추가하지 않는다. 해외 원문을 장문 복제하지 않는다.\n"+
+ "원문 매체명·날짜·링크와 해시태그를 유지한다. 기존 게시글은 수정·삭제하지 않는다.\n"+
+ "최종 발행 버튼은 누르지 말고 발행 직전 사용자 확인을 요청한다.\n\n"+
+ "선택 뉴스\n제목: "+(x?.title||"")+"\n매체: "+(x?.source||"")+"\n날짜: "+(x?.date||"")+"\n원문: "+(x?.url||"")+"\n\n"+
+ "BLOG FACTORY: https://miraclelife77-cmd.github.io/blog-factory/";
+ box.style.display="block";
+}
+async function copyWorkPackage(){
+ const ta=document.getElementById("workPackageText"); if(!ta)return;
+ try{await navigator.clipboard.writeText(ta.value); alert("Work 작업지시서를 복사했습니다.");}
+ catch(e){ta.select(); document.execCommand("copy");}
 }
