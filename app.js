@@ -136,3 +136,61 @@ function downloadImage(i){
   const a=document.createElement("a"); a.href=x.dataUrl; a.download=(i===0?"thumbnail":"blog-image-"+i)+".png"; a.click();
 }
 renderImageCards();
+
+/* BLOG FACTORY v2.1 one-click Naver publish preparation */
+let preparedArticle="";
+function bodyImagePlans(){return imagePlan.filter((x,i)=>i>0).slice(0,3)}
+function placeImageMarkers(text){
+  const clean=String(text||"").replace(/\n*\[이미지\s*[1-3]\s*삽입\]\n*/g,"\n\n");
+  const paras=clean.split(/\n\s*\n/).map(x=>x.trim()).filter(Boolean);
+  if(paras.length<4){
+    let out=clean.trim();
+    bodyImagePlans().forEach((x,i)=>{out+="\n\n[이미지 "+(i+1)+" 삽입]\n"+(x.caption?("※ "+x.caption):"")});
+    return out;
+  }
+  const count=bodyImagePlans().length;
+  const slots=[];
+  for(let i=1;i<=count;i++) slots.push(Math.max(1,Math.min(paras.length-1,Math.round(paras.length*i/(count+1)))));
+  let offset=0;
+  slots.forEach((pos,i)=>{
+    const x=bodyImagePlans()[i];
+    paras.splice(pos+offset,0,"[이미지 "+(i+1)+" 삽입]"+(x?.caption?"\n※ "+x.caption:""));
+    offset++;
+  });
+  return paras.join("\n\n");
+}
+async function prepareNaver(){
+  const st=document.getElementById("prepareStatus");
+  if(!document.getElementById("content").value.trim()){st.textContent="먼저 AI 글을 생성해주세요.";return}
+  if(imagePlan.length<4){st.textContent="이미지 계획이 없습니다. AI 글을 새로 생성해주세요.";return}
+  st.textContent="네이버 게시 패키지를 준비하고 있습니다. 이미지 4장을 생성합니다…";
+  try{
+    for(let i=0;i<imagePlan.length;i++) if(!imagePlan[i].dataUrl) await generateImage(i);
+    const failed=imagePlan.some(x=>!x.dataUrl);
+    if(failed){st.textContent="일부 이미지 생성에 실패했습니다. 해당 이미지의 AI 이미지 생성을 다시 눌러주세요.";return}
+    preparedArticle=placeImageMarkers(document.getElementById("content").value);
+    document.getElementById("content").value=preparedArticle;
+    document.getElementById("publishPack").style.display="block";
+    st.textContent="준비 완료: 이미지 위치 지정 + 이미지 4장 생성 + 본문 일괄복사가 준비되었습니다.";
+  }catch(e){st.textContent="게시 준비 실패: "+e.message}
+}
+async function copyPreparedArticle(){
+  preparedArticle=placeImageMarkers(document.getElementById("content").value);
+  const title=document.getElementById("title").value.trim();
+  const tags=document.getElementById("tags").value.trim();
+  await copyText(title+"\n\n"+preparedArticle+(tags?"\n\n"+tags:""));
+}
+function dataUrlToBlob(dataUrl){
+  const [head,data]=dataUrl.split(","), mime=(head.match(/data:(.*?);/)||[])[1]||"image/png";
+  const bin=atob(data); const arr=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);
+  return new Blob([arr],{type:mime});
+}
+async function downloadAllImages(){
+  const ready=imagePlan.filter(x=>x.dataUrl);
+  if(ready.length!==imagePlan.length)return alert("이미지 4장을 먼저 생성해주세요.");
+  ready.forEach((x,i)=>setTimeout(()=>{
+    const a=document.createElement("a"); a.href=URL.createObjectURL(dataUrlToBlob(x.dataUrl));
+    a.download=i===0?"00-thumbnail.png":("0"+i+"-body-image-"+i+".png"); a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+  },i*350));
+}
