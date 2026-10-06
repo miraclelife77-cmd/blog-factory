@@ -301,3 +301,31 @@ async function suggest(){
     const st=document.getElementById("aiStatus"); if(st)st.textContent="AI 주제 추천 연결이 지연되어 기본 주제 후보를 표시했습니다.";
   }finally{if(btn){btn.disabled=false;btn.textContent="✨ 오늘 뭐 쓰지?"}}
 }
+
+
+/* BLOG FACTORY v4 global briefing */
+function briefingEndpoint(){return aiEndpoint().replace(/\/api\/generate\/?$/,"/api/briefing")}
+async function loadBriefing(){
+  const st=document.getElementById("newsStatus"),box=document.getElementById("newsCards"),btn=document.getElementById("newsBtn");
+  st.textContent="국내외 최신 뉴스를 검색하고 연결고리를 분석하고 있습니다…"; box.innerHTML=""; btn.disabled=true;
+  try{
+    const r=await fetch(briefingEndpoint(),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({topic:document.getElementById("newsTopic").value,region:document.getElementById("newsRegion").value})});
+    const d=await r.json(); if(!r.ok)throw new Error(d.error||("HTTP "+r.status));
+    window.latestBriefing=d;
+    renderBriefing(d); st.textContent="최신 브리핑을 준비했습니다. 원문을 확인한 뒤 블로그 소재로 발전시킬 수 있습니다.";
+  }catch(e){st.textContent="뉴스 수집 실패: "+e.message}
+  finally{btn.disabled=false}
+}
+function renderBriefing(d){
+  const box=document.getElementById("newsCards"); const items=Array.isArray(d.items)?d.items:[];
+  let h=d.connection?'<div class="card"><b>🔗 오늘의 연결고리</b><p>'+esc(d.connection)+'</p></div>':"";
+  h+=items.map((x,i)=>'<div class="card"><div class="muted">'+esc(x.category||"")+" · "+esc(x.source||"")+" · "+esc(x.date||"")+'</div><h3>'+esc(x.title||"")+'</h3><p>'+esc(x.summary||"")+'</p><p><b>왜 중요한가:</b> '+esc(x.why||"")+'</p><p><b>한국과의 연결:</b> '+esc(x.korea||"")+'</p><div class="actions">'+(x.url?'<a class="btn" target="_blank" rel="noopener" href="'+esc(x.url)+'">원문 보기</a>':"")+'<button class="btn primary" onclick="briefingToArticle('+i+')">이 뉴스로 글 만들기</button></div></div>').join("");
+  box.innerHTML=h||'<div class="card muted">표시할 뉴스가 없습니다.</div>';
+}
+function briefingToArticle(i){
+  const x=window.latestBriefing?.items?.[i]; if(!x)return;
+  document.getElementById("project").value=x.category&&/탄소|배출권|에너지|재활용|친환경/.test(x.category)?"환경과 탄소":"새로운 사업 탐구";
+  document.getElementById("topic").value=x.title||"글로벌 브리핑";
+  document.getElementById("aiPrompt").value="다음 최신 뉴스 브리핑을 바탕으로 한국 독자를 위한 네이버 블로그 글을 작성해 주세요. 원문을 장문 번역하거나 복제하지 말고 사실을 요약·해설하고 어려운 개념을 쉽게 설명하세요. 원문 매체·날짜·링크를 글 마지막에 출처로 명시하고, 확인되지 않은 추론은 사실처럼 단정하지 마세요.\n\n제목: "+(x.title||"")+"\n매체: "+(x.source||"")+"\n날짜: "+(x.date||"")+"\n핵심요약: "+(x.summary||"")+"\n중요성: "+(x.why||"")+"\n한국과의 연결: "+(x.korea||"")+"\n원문: "+(x.url||"");
+  document.querySelector('[data-p="today"]').click(); generateAIFromPrompt();
+}
