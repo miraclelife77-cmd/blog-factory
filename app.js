@@ -115,20 +115,24 @@ function renderImageCards(){
       <div class="muted" style="margin:6px 0">${esc(x.caption||"")}</div>
       <div id="imgStatus${i}" class="muted"></div>
       <div id="imgBox${i}" style="margin-top:8px"></div>
-      <div class="actions"><button class="btn" onclick="generateImage(${i})">AI 이미지 생성</button></div>
+      <div class="actions"><button class="btn" onclick="generateImage(${i})">AI 이미지 생성</button><label class="btn" style="display:inline-block;margin:0">실제 사진으로 교체<input type="file" accept="image/*" hidden onchange="useRealPhoto(${i},this)"></label></div>
     </div>`).join("");
 }
 async function generateImage(i){
   const x=imagePlan[i], st=document.getElementById("imgStatus"+i), box=document.getElementById("imgBox"+i);
   if(!x)return; st.textContent="이미지 생성 중…";
   try{
-    const res=await fetch(imageEndpoint(),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt:x.prompt,role:x.role})});
+    const res=await fetch(imageEndpoint(),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt:x.prompt,role:isThumbnail(x,i)?"썸네일":"본문 이미지",thumbnailText:isThumbnail(x,i)?document.getElementById("thumb").value.trim():""})});
     const data=await res.json(); if(!res.ok)throw new Error(data.error||("HTTP "+res.status));
     const src="data:image/png;base64,"+data.image;
     x.dataUrl=src;
     box.innerHTML='<img src="'+src+'" style="width:100%;max-height:360px;object-fit:cover;border-radius:10px"><div class="actions"><button class="btn" onclick="downloadImage('+i+')">PNG 저장</button></div>';
-    st.textContent=(x.role==="썸네일"?"썸네일 이미지":"본문 삽입 이미지")+" 생성 완료";
+    st.textContent=(isThumbnail(x,i)?"대표/썸네일 이미지":"본문 삽입 이미지")+" 생성 완료";
   }catch(e){st.textContent="이미지 생성 실패: "+e.message}
+}
+function useRealPhoto(i,input){
+  const f=input.files&&input.files[0],x=imagePlan[i],st=document.getElementById("imgStatus"+i),box=document.getElementById("imgBox"+i); if(!f||!x)return;
+  const r=new FileReader(); r.onload=()=>{x.dataUrl=r.result;x.sourceType="real";box.innerHTML='<img src="'+r.result+'" style="width:100%;max-height:360px;object-fit:cover;border-radius:10px"><div class="actions"><button class="btn" onclick="downloadImage('+i+')">PNG 저장</button></div>';st.textContent=(isThumbnail(x,i)?"대표/썸네일":"본문")+" 실제 사진 적용 완료";}; r.readAsDataURL(f);
 }
 async function generateAllImages(){for(let i=0;i<imagePlan.length;i++)await generateImage(i)}
 function downloadImage(i){
@@ -139,7 +143,7 @@ renderImageCards();
 
 /* BLOG FACTORY v2.1 one-click Naver publish preparation */
 let preparedArticle="";
-function bodyImagePlans(){return imagePlan.filter((x,i)=>i>0).slice(0,3)}
+function isThumbnail(x,i){return i===0||/썸네일|대표/.test(String(x?.role||""))}\nfunction bodyImagePlans(){return imagePlan.filter((x,i)=>!isThumbnail(x,i)).slice(0,3)}
 function placeImageMarkers(text){
   const clean=String(text||"").replace(/\n*\[이미지\s*[1-3]\s*삽입\]\n*/g,"\n\n");
   const paras=clean.split(/\n\s*\n/).map(x=>x.trim()).filter(Boolean);
