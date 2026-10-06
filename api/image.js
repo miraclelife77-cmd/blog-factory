@@ -13,7 +13,7 @@ export default async function handler(req,res){
       headers:{"Authorization":"Bearer "+process.env.OPENAI_API_KEY,"Content-Type":"application/json"},
       body:JSON.stringify({
         model:"gpt-image-2",
-        prompt: role==="썸네일" ? ("Create a polished Korean Naver blog cover/thumbnail, informative editorial style, not a flashy ad. "+prompt+" Integrate this exact Korean headline prominently and legibly: \\""+thumbnailText.replace(/[\\"]/g,"")+"\\". No other text, no logos, no watermark. Do not imply this is documentary evidence of a specific real company or site.") : ("Korean Naver blog editorial image. "+prompt+" No text, no letters, no logos, no watermark. Do not imply this is documentary evidence of a specific real company or site."),
+        prompt: role==="썸네일" ? ("Create a polished Korean Naver blog cover/thumbnail, informative editorial style, not a flashy ad. "+prompt+" Integrate this exact Korean headline prominently and legibly: \""+thumbnailText.replace(/[\"]/g,"")+"\". No other text, no logos, no watermark. Do not imply this is documentary evidence of a specific real company or site.") : ("Korean Naver blog editorial image. "+prompt+" No text, no letters, no logos, no watermark. Do not imply this is documentary evidence of a specific real company or site."),
         n:1,
         size:role==="썸네일"?"1024x1024":"1536x1024",
         quality:"low",
