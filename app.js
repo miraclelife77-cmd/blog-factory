@@ -70,7 +70,7 @@ function renderRecords(){
 document.getElementById("project").addEventListener("change",function(){projectSafety();suggest();});
 
 /* BLOG FACTORY v1.5 AI bridge */
-function aiEndpoint(){return (db.settings&&db.settings.aiEndpoint)||""}
+function aiEndpoint(){return (db.settings&&db.settings.aiEndpoint)||"https://blog-factory-omega.vercel.app/api/generate"}
 const _saveSettings=saveSettings;
 saveSettings=function(){
   db.settings={blogId:document.getElementById("blogId").value,identity:document.getElementById("identity").value,length:document.getElementById("length").value,freq:document.getElementById("freq").value,aiEndpoint:document.getElementById("aiEndpoint").value.trim()};
