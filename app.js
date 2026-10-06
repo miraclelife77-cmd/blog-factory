@@ -146,6 +146,7 @@ renderImageCards();
 
 /* BLOG FACTORY v2.1 one-click Naver publish preparation */
 let preparedArticle="";
+let preparedPackage=null;
 function isThumbnail(x,i){return i===0||/썸네일|대표/.test(String(x?.role||""))}
 function bodyImagePlans(){return imagePlan.filter((x,i)=>!isThumbnail(x,i)).slice(0,3)}
 function placeImageMarkers(text){
@@ -178,8 +179,18 @@ async function prepareNaver(){
     if(failed){st.textContent="일부 이미지 생성에 실패했습니다. 해당 이미지의 AI 이미지 생성을 다시 눌러주세요.";return}
     preparedArticle=placeImageMarkers(document.getElementById("content").value);
     document.getElementById("content").value=preparedArticle;
+    st.textContent="이미지 4장을 공용 저장소에 업로드하고 있습니다…";
+    const packageId="prep-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,7);
+    const uploaded=[];
+    for(let i=0;i<imagePlan.length;i++){
+      const x=imagePlan[i];
+      const rr=await fetch(queueEndpoint(),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"upload-image",packageId,index:i,dataUrl:x.dataUrl,role:x.role,caption:x.caption,sourceType:x.sourceType||"ai"})});
+      const dd=await rr.json();if(!rr.ok)throw new Error(dd.error||("이미지 "+(i+1)+" 업로드 실패"));
+      uploaded.push(dd.image);
+    }
+    preparedPackage={packageId,images:uploaded,sources:Array.isArray(window.currentSources)?window.currentSources.map(v=>({...v})):[]};
     document.getElementById("publishPack").style.display="block";
-    st.textContent="준비 완료: 이미지 위치 지정 + 이미지 4장 생성 + 본문 일괄복사가 준비되었습니다.";
+    st.textContent="준비 완료: 이미지 4장 공용 저장 + 출처 연결 + 본문 위치 지정이 완료되었습니다.";
   }catch(e){st.textContent="게시 준비 실패: "+e.message}
 }
 async function copyPreparedArticle(){
@@ -354,8 +365,8 @@ async function copyWorkPackage(){
 function queueEndpoint(){return aiEndpoint().replace(/\/api\/generate\/?$/,"/api/queue")}
 function currentQueuePayload(){
  const val=id=>document.getElementById(id)?.value||"";
- const sources=Array.isArray(window.currentSources)?window.currentSources:[];
- const images=(imagePlan||[]).map((x,i)=>({role:x.role||"",caption:x.caption||"",sourceType:x.sourceType||"ai",dataUrl:x.dataUrl||""}));
+ const sources=preparedPackage?.sources?.length?preparedPackage.sources:(Array.isArray(window.currentSources)?window.currentSources:[]);
+ const images=preparedPackage?.images?.length?preparedPackage.images:(imagePlan||[]).map(x=>({role:x.role||"",caption:x.caption||"",sourceType:x.sourceType||"ai",dataUrl:x.dataUrl||""}));
  return {title:val("title"),content:val("content"),category:val("project"),hashtags:val("tags"),thumbnail:val("thumb"),sourcePrompt:val("aiPrompt"),sources,images,status:"게시 대기",createdAt:new Date().toISOString()};
 }
 async function sendCurrentToQueue(){
