@@ -230,3 +230,48 @@ function makeStoreZip(files){
   const end=new Uint8Array([80,75,5,6,0,0,0,0,...u16(count),...u16(count),...u32(centralSize),...u32(offset),0,0]);
   return new Blob([...locals,...centrals,end],{type:"application/zip"});
 }
+
+
+/* BLOG FACTORY v3 AI 작업실 */
+db.chat=db.chat||[];
+function chatEndpoint(){return aiEndpoint().replace(/\/api\/generate\/?$/,"/api/chat")}
+function renderChat(){
+  const box=document.getElementById("chatMessages"); if(!box)return;
+  box.innerHTML=db.chat.length?db.chat.map(m=>'<div class="chat '+(m.role==="user"?"me":"ai")+'"><b>'+(m.role==="user"?"나":"BLOG AI")+'</b><div>'+esc(m.text).replace(/\n/g,"<br>")+'</div></div>').join(""):'<div class="muted">무엇이든 이야기해 보세요. 아이디어를 넓힌 뒤 마음에 들면 ‘이 대화로 글 만들기’를 누르세요.</div>';
+  box.scrollTop=box.scrollHeight;
+}
+async function sendChat(){
+  const input=document.getElementById("chatInput"),st=document.getElementById("chatStatus"),msg=input.value.trim(); if(!msg)return;
+  db.chat.push({role:"user",text:msg}); input.value=""; persist(); renderChat(); st.textContent="BLOG AI가 생각 중…";
+  try{
+    const recent=db.chat.slice(-12);
+    const r=await fetch(chatEndpoint(),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({messages:recent,identity:db.settings.identity})});
+    const d=await r.json(); if(!r.ok)throw new Error(d.error||("HTTP "+r.status));
+    db.chat.push({role:"assistant",text:d.reply||""}); persist(); renderChat(); st.textContent="";
+  }catch(e){st.textContent="대화 실패: "+e.message}
+}
+function chatToArticle(){
+  if(!db.chat.length)return alert("먼저 AI 작업실에서 대화해주세요.");
+  const transcript=db.chat.slice(-12).map(m=>(m.role==="user"?"나: ":"BLOG AI: ")+m.text).join("\n");
+  document.getElementById("project").value="일반 / 생각과 기록";
+  document.getElementById("topic").value="AI 작업실 대화에서 발전한 주제";
+  document.getElementById("aiPrompt").value="다음 BLOG FACTORY AI 작업실 대화를 바탕으로 네이버 블로그 게시용 글을 작성해 주세요. 대화 자체를 그대로 옮기지 말고 핵심 아이디어를 하나의 자연스러운 주제로 발전시키세요.\n\n"+transcript+"\n\n기존 BLOG FACTORY의 공개·보안 원칙을 지키고, 제목 1개·썸네일 문구·#이 붙을 해시태그·완성 본문·이미지 계획 4개를 만들어 주세요.";
+  document.querySelector('[data-p="today"]').click();
+  generateAIFromPrompt();
+}
+async function generateAIFromPrompt(){
+  const status=document.getElementById("aiStatus"),endpoint=aiEndpoint(),prompt=document.getElementById("aiPrompt").value; if(!prompt)return;
+  status.textContent="AI 작업실 대화를 게시용 글로 만들고 있습니다…";
+  try{
+    const res=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt,project:document.getElementById("project").value,topic:document.getElementById("topic").value,verification:db.verify})});
+    const data=await res.json(); if(!res.ok)throw new Error(data.error||("HTTP "+res.status));
+    document.getElementById("title").value=data.title||"";
+    document.getElementById("thumb").value=data.thumbnail||"";
+    document.getElementById("tags").value=(data.hashtags||[]).map(t=>String(t).startsWith("#")?t:"#"+t).join(" ");
+    document.getElementById("content").value=data.content||"";
+    imagePlan=Array.isArray(data.images)?data.images:[]; renderImageCards();
+    status.textContent="AI 작업실 대화로 게시용 원고를 만들었습니다.";
+  }catch(e){status.textContent="글 생성 실패: "+e.message}
+}
+function clearChat(){if(confirm("AI 작업실 대화를 비울까요?")){db.chat=[];persist();renderChat()}}
+document.addEventListener("DOMContentLoaded",renderChat);
