@@ -143,7 +143,8 @@ renderImageCards();
 
 /* BLOG FACTORY v2.1 one-click Naver publish preparation */
 let preparedArticle="";
-function isThumbnail(x,i){return i===0||/썸네일|대표/.test(String(x?.role||""))}\nfunction bodyImagePlans(){return imagePlan.filter((x,i)=>!isThumbnail(x,i)).slice(0,3)}
+function isThumbnail(x,i){return i===0||/썸네일|대표/.test(String(x?.role||""))}
+function bodyImagePlans(){return imagePlan.filter((x,i)=>!isThumbnail(x,i)).slice(0,3)}
 function placeImageMarkers(text){
   const clean=String(text||"").replace(/\n*\[이미지\s*[1-3]\s*삽입\]\n*/g,"\n\n");
   const paras=clean.split(/\n\s*\n/).map(x=>x.trim()).filter(Boolean);
