@@ -95,7 +95,7 @@ async function generateAI(){
     const data=await res.json();
     document.getElementById("title").value=data.title||"";
     document.getElementById("thumb").value=data.thumbnail||data.thumb||"";
-    document.getElementById("tags").value=Array.isArray(data.hashtags)?data.hashtags.join(" "):(data.hashtags||data.tags||"");
+    document.getElementById("tags").value=Array.isArray(data.hashtags)?data.hashtags.map(t=>{t=String(t).trim();return t?(t.startsWith("#")?t:"#"+t):""}).filter(Boolean).join(" "):String(data.hashtags||data.tags||"").split(/\\s+/).filter(Boolean).map(t=>t.startsWith("#")?t:"#"+t).join(" ");
     document.getElementById("content").value=data.content||data.body||"";
     imagePlan=Array.isArray(data.images)?data.images:[]; renderImageCards();
     status.textContent="게시용 원고 생성 완료. 본문을 검토하고 이미지를 생성해주세요.";
