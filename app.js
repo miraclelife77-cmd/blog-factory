@@ -31,7 +31,8 @@ function editRec(id){
   document.getElementById("content").value=r.content||"";
   document.getElementById("url").value=r.url||"";
   projectSafety(); makePrompt();
-  document.querySelector('[data-p="today"]').click();
+  window.currentSources=x.sources||[]; imagePlan=(x.images||[]).map(v=>({...v})); renderImageCards();
+ document.querySelector('[data-p="today"]').click();
 }
 function savePost(pub){
   const title=document.getElementById("title").value.trim();
@@ -324,6 +325,7 @@ function renderBriefing(d){
 }
 function briefingToArticle(i){
   const x=window.latestBriefing?.items?.[i]; if(!x)return;
+  window.currentSources=[{title:x.title||"",source:x.source||"",date:x.date||"",url:x.url||""}];
   document.getElementById("project").value=x.category&&/탄소|배출권|에너지|재활용|친환경/.test(x.category)?"환경과 탄소":"새로운 사업 탐구";
   document.getElementById("topic").value=x.title||"글로벌 브리핑";
   document.getElementById("aiPrompt").value="다음 최신 뉴스 브리핑을 바탕으로 한국 독자를 위한 네이버 블로그 글을 작성해 주세요. 원문을 장문 번역하거나 복제하지 말고 사실을 요약·해설하고 어려운 개념을 쉽게 설명하세요. 원문 매체·날짜·링크를 글 마지막에 출처로 명시하고, 확인되지 않은 추론은 사실처럼 단정하지 마세요.\n\n제목: "+(x.title||"")+"\n매체: "+(x.source||"")+"\n날짜: "+(x.date||"")+"\n핵심요약: "+(x.summary||"")+"\n중요성: "+(x.why||"")+"\n한국과의 연결: "+(x.korea||"")+"\n원문: "+(x.url||"");
@@ -352,14 +354,22 @@ async function copyWorkPackage(){
 function queueEndpoint(){return aiEndpoint().replace(/\/api\/generate\/?$/,"/api/queue")}
 function currentQueuePayload(){
  const val=id=>document.getElementById(id)?.value||"";
- return {title:val("title"),content:val("content"),category:val("project"),hashtags:val("tags"),thumbnail:val("thumb"),sourcePrompt:val("aiPrompt"),status:"게시 대기",createdAt:new Date().toISOString()};
+ const sources=Array.isArray(window.currentSources)?window.currentSources:[];
+ const images=(imagePlan||[]).map((x,i)=>({role:x.role||"",caption:x.caption||"",sourceType:x.sourceType||"ai",dataUrl:x.dataUrl||""}));
+ return {title:val("title"),content:val("content"),category:val("project"),hashtags:val("tags"),thumbnail:val("thumb"),sourcePrompt:val("aiPrompt"),sources,images,status:"게시 대기",createdAt:new Date().toISOString()};
 }
 async function sendCurrentToQueue(){
  const st=document.getElementById("queueSaveStatus"),p=currentQueuePayload();
  if(!p.title||!p.content){st.textContent="먼저 제목과 본문을 완성해 주세요.";return}
- st.textContent="공용 대기열에 저장 중…";
- try{const r=await fetch(queueEndpoint(),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(p)});const d=await r.json();if(!r.ok)throw new Error(d.error||"저장 실패");st.textContent="✓ Work와 공유되는 게시 대기에 등록했습니다.";loadQueue();}
- catch(e){st.textContent="저장 실패: "+e.message}
+ const mentionsExternal=/https?:\/\/|IEA|국제에너지기구|Reuters|Bloomberg|로이터|정부|보고서|뉴스|기사/.test(p.content+" "+p.sourcePrompt);
+ if(mentionsExternal&&!p.sources.length){st.textContent="출처가 필요한 글입니다. 글로벌 브리핑에서 원문을 선택하거나 출처 정보를 먼저 연결해 주세요.";return}
+ if((imagePlan||[]).length&&p.images.some(x=>!x.dataUrl)){st.textContent="이미지 계획이 있습니다. 이미지 4장을 먼저 생성한 뒤 등록해 주세요.";return}
+ st.textContent="출처와 이미지를 포함해 공용 대기열에 저장 중…";
+ try{
+   const r=await fetch(queueEndpoint(),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(p)});
+   const d=await r.json();if(!r.ok)throw new Error(d.error||"저장 실패");
+   st.textContent="✓ 출처·이미지를 포함한 완성 패키지를 Work와 공유했습니다.";loadQueue();
+ }catch(e){st.textContent="저장 실패: "+e.message}
 }
 async function loadQueue(){
  const box=document.getElementById("queueList"); if(!box)return; box.innerHTML='<div class="card muted">공용 대기열을 불러오는 중…</div>';
