@@ -14,8 +14,8 @@ export default async function handler(req, res) {
       body:JSON.stringify({
         model:"gpt-5.6-luna",
         reasoning:{effort:"low"},
-        input:[{role:"system",content:[{type:"input_text",text:"You write Korean Naver blog drafts. Return ONLY valid JSON with keys title, thumbnail, hashtags, content. hashtags must be an array of strings. Never invent verification. Respect attribution requirements in the user's prompt."}]},{role:"user",content:[{type:"input_text",text:prompt}]}],
-        text:{format:{type:"json_schema",name:"blog_post",strict:true,schema:{type:"object",properties:{title:{type:"string"},thumbnail:{type:"string"},hashtags:{type:"array",items:{type:"string"}},content:{type:"string"}},required:["title","thumbnail","hashtags","content"],additionalProperties:false}}}
+        input:[{role:"system",content:[{type:"input_text",text:"Write a publish-ready Korean Naver blog post. Return ONLY valid JSON matching the schema. The content field must contain ONLY the final reader-facing article: never include title candidates, drafting notes, verification-note labels, prompt instructions, internal reasoning, or AI workflow. Never invent verification. Respect confidentiality and attribution requirements. Create exactly 4 image plans: first is a thumbnail, next three are body images. Image prompts must be visual-only with no embedded text, logos or watermarks. AI-generated images must never be described as documentary proof of a real site."}]},{role:"user",content:[{type:"input_text",text:prompt}]}],
+        text:{format:{type:"json_schema",name:"blog_post",strict:true,schema:{type:"object",properties:{title:{type:"string"},thumbnail:{type:"string"},hashtags:{type:"array",items:{type:"string"}},content:{type:"string"},images:{type:"array",minItems:4,maxItems:4,items:{type:"object",properties:{role:{type:"string"},caption:{type:"string"},prompt:{type:"string"}},required:["role","caption","prompt"],additionalProperties:false}}},required:["title","thumbnail","hashtags","content","images"],additionalProperties:false}}}
       })
     });
     const data=await r.json();
