@@ -278,3 +278,26 @@ async function generateAIFromPrompt(){
 }
 function clearChat(){if(confirm("AI 작업실 대화를 비울까요?")){db.chat=[];persist();renderChat()}}
 document.addEventListener("DOMContentLoaded",renderChat);
+
+
+/* BLOG FACTORY v3.1 dynamic topic discovery */
+function topicEndpoint(){return aiEndpoint().replace(/\/api\/generate\/?$/,"/api/topics")}
+async function suggest(){
+  const box=document.getElementById("topics"),btn=document.getElementById("suggestBtn");
+  const project=document.getElementById("project").value;
+  box.innerHTML='<div class="muted">AI가 새로운 소재를 찾고 있습니다…</div>';
+  if(btn){btn.disabled=true;btn.textContent="찾는 중…"}
+  try{
+    const used=[...new Set(db.records.flatMap(r=>[r.topic,r.title]).filter(Boolean))].slice(0,40);
+    const r=await fetch(topicEndpoint(),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({project,identity:db.settings.identity,used})});
+    const d=await r.json(); if(!r.ok)throw new Error(d.error||("HTTP "+r.status));
+    const topics=Array.isArray(d.topics)?d.topics.slice(0,3):[];
+    if(topics.length!==3)throw new Error("추천 결과 부족");
+    box.innerHTML=topics.map(v=>'<div class="topic" onclick="pick(this)">'+esc(v)+'</div>').join("");
+  }catch(e){
+    const u=usedTopics(),pool=(banks[project]||Object.values(banks).flat()).filter(x=>!u.has(x));
+    const x=(pool.length?pool:(banks[project]||Object.values(banks).flat())).slice().sort(()=>Math.random()-.5).slice(0,3);
+    box.innerHTML=x.map(v=>'<div class="topic" onclick="pick(this)">'+esc(v)+'</div>').join("");
+    const st=document.getElementById("aiStatus"); if(st)st.textContent="AI 주제 추천 연결이 지연되어 기본 주제 후보를 표시했습니다.";
+  }finally{if(btn){btn.disabled=false;btn.textContent="✨ 오늘 뭐 쓰지?"}}
+}
