@@ -23,7 +23,7 @@ function projectSafety(){
 function editRec(id){
   const r=db.records.find(x=>x.id===id); if(!r)return;
   editingId=id;
-  document.getElementById("project").value=r.project||"일반 / 생각과 기록";
+  document.getElementById("project").value=r.project||"생각과 기록";
   document.getElementById("topic").value=r.topic||"";
   document.getElementById("title").value=r.title||"";
   document.getElementById("thumb").value=r.thumb||"";
@@ -256,7 +256,7 @@ async function sendChat(){
 function chatToArticle(){
   if(!db.chat.length)return alert("먼저 AI 작업실에서 대화해주세요.");
   const transcript=db.chat.slice(-12).map(m=>(m.role==="user"?"나: ":"BLOG AI: ")+m.text).join("\n");
-  document.getElementById("project").value="일반 / 생각과 기록";
+  document.getElementById("project").value="생각과 기록";
   document.getElementById("topic").value="AI 작업실 대화에서 발전한 주제";
   document.getElementById("aiPrompt").value="다음 BLOG FACTORY AI 작업실 대화를 바탕으로 네이버 블로그 게시용 글을 작성해 주세요. 대화 자체를 그대로 옮기지 말고 핵심 아이디어를 하나의 자연스러운 주제로 발전시키세요.\n\n"+transcript+"\n\n기존 BLOG FACTORY의 공개·보안 원칙을 지키고, 제목 1개·썸네일 문구·#이 붙을 해시태그·완성 본문·이미지 계획 4개를 만들어 주세요.";
   document.querySelector('[data-p="today"]').click();
