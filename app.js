@@ -407,12 +407,34 @@ async function sendCurrentToQueue(){
  const mentionsExternal=/https?:\/\/|IEA|국제에너지기구|Reuters|Bloomberg|로이터|정부|보고서|뉴스|기사/.test(p.content+" "+p.sourcePrompt);
  if(mentionsExternal&&!p.sources.length){st.textContent="출처가 필요한 글입니다. 글로벌 브리핑에서 원문을 선택하거나 출처 정보를 먼저 연결해 주세요.";return}
  if(p.images.length!==4){st.textContent="완성 패키지는 이미지 4장이 필요합니다. ‘네이버 게시 준비’를 먼저 실행해 주세요.";return}
- st.textContent="출처와 이미지를 포함해 공용 대기열에 저장 중…";
+ st.textContent="게시 대기열용 이미지를 안전하게 분할 저장 중…";
  try{
+   /* Never send four base64 images in one request. Vercel request limits can turn
+      an oversized cross-origin POST into a browser-level 'Failed to fetch'.
+      Upload each image first, then queue only lightweight Blob path metadata. */
+   const packageId="queue-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,7);
+   const saved=[];
+   for(let i=0;i<p.images.length;i++){
+     const im=p.images[i]||{};
+     if(im.pathname){saved.push({pathname:im.pathname,role:im.role||"",caption:im.caption||"",sourceType:im.sourceType||"ai"});continue}
+     if(!im.dataUrl)throw new Error("이미지 "+(i+1)+" 데이터가 없습니다. 네이버 게시 준비를 다시 실행해 주세요.");
+     st.textContent="이미지 "+(i+1)+"/4 저장 중…";
+     const ur=await fetch(queueEndpoint(),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"upload-image",packageId,index:i,dataUrl:im.dataUrl,role:im.role,caption:im.caption,sourceType:im.sourceType||"ai"})});
+     let ud={};try{ud=await ur.json()}catch{}
+     if(!ur.ok)throw new Error(ud.error||("이미지 "+(i+1)+" 업로드 HTTP "+ur.status));
+     saved.push(ud.image);
+   }
+   p.images=saved;
+   st.textContent="이미지 저장 완료. 글·출처 정보를 게시 대기열에 등록 중…";
    const r=await fetch(queueEndpoint(),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(p)});
-   const d=await r.json();if(!r.ok)throw new Error(d.error||"저장 실패");
-   st.textContent="✓ 출처·이미지를 포함한 완성 패키지를 Work와 공유했습니다.";loadQueue();
- }catch(e){st.textContent="저장 실패: "+e.message}
+   let d={};try{d=await r.json()}catch{}
+   if(!r.ok)throw new Error(d.error||("저장 HTTP "+r.status));
+   preparedPackage={packageId,images:saved,sources:p.sources.map(v=>({...v}))};
+   st.textContent="✓ 출처·이미지 4장을 포함한 완성 패키지를 게시 대기열에 저장했습니다.";loadQueue();
+ }catch(e){
+   st.textContent="저장 실패: "+e.message;
+   if(/Failed to fetch/i.test(e.message))st.textContent+=" · 네트워크 또는 서버 연결을 확인한 뒤 다시 눌러주세요. 이미 만든 글은 사라지지 않습니다.";
+ }
 }
 function formatQueueTime(iso){
  try{return new Intl.DateTimeFormat("ko-KR",{timeZone:"Asia/Seoul",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hour12:false}).format(new Date(iso));}catch{return String(iso||"")}
