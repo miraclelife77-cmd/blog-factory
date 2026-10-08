@@ -453,10 +453,11 @@ async function loadQueue(){
   const r=await fetch(queueEndpoint());const d=await r.json();if(!r.ok)throw new Error(d.error||"불러오기 실패");const items=d.items||[];
   box.innerHTML=items.length?items.map(x=>'<div class="card"><div class="muted">'+esc(x.status||"게시 대기")+' · '+esc(formatQueueTime(x.createdAt))+' (한국시간)</div><h3>'+esc(x.title||"제목 없음")+'</h3><p>'+esc((x.content||"").slice(0,180))+(x.content?.length>180?"…":"")+'</p><div class="muted">카테고리: '+esc(x.category||"")+' · '+esc(x.hashtags||"")+'</div>'+queueDetailsHtml(x)+'<button class="btn primary" style="margin-top:10px" onclick="openQueueItem(\''+x.id+'\')">내용 열기</button></div>').join(""):'<div class="card muted">현재 게시 대기 콘텐츠가 없습니다.</div>';
   window.sharedQueue=items;
- }catch(e){box.innerHTML='<div class="card">대기열 불러오기 실패: '+esc(e.message)+'</div>'}
+ }catch(e){box.innerHTML='<div class="card">대기열 불러오기 실패: '+esc(e.message)+'<p class="muted">서버 연결 또는 CORS 상태를 확인해주세요. 작성 중인 글은 유지됩니다.</p><button class="btn" onclick="loadQueue()">다시 시도</button></div>'}
 }
-function openQueueItem(id){
- const x=(window.sharedQueue||[]).find(v=>v.id===id);if(!x)return;
+async function openQueueItem(id){
+ let x=(window.sharedQueue||[]).find(v=>v.id===id);if(!x)return;
+ try{const r=await fetch(queueEndpoint()+"?id="+encodeURIComponent(id));const d=await r.json();if(!r.ok)throw new Error(d.error||"글 불러오기 실패");x=d.item;}catch(e){alert("글 전체 불러오기 실패: "+e.message);return;}
  ["title","content","project","tags","thumb","aiPrompt"].forEach(k=>{const map={project:"category",tags:"hashtags",thumb:"thumbnail",aiPrompt:"sourcePrompt"};const el=document.getElementById(k);if(el)el.value=x[map[k]||k]||""});
  window.currentSources=x.sources||[];
  imagePlan=(x.images||[]).map(v=>({...v,dataUrl:v.pathname?(queueEndpoint()+"?asset="+encodeURIComponent(v.pathname)):""}));
