@@ -230,10 +230,13 @@ function richArticleHtml(){
  const tags=esc(document.getElementById("tags").value.trim());
  const body=placeImageMarkers(document.getElementById("content").value);
  const images=imagePlan.slice(0,4);
+ const publishedImages=Array.isArray(preparedPackage?.images)?preparedPackage.images:[];
  let count=0;
  const imageHtml=i=>{
    const x=images[i];if(!x?.dataUrl)return "";
-   return '<figure style="margin:22px 0;text-align:center"><img src="'+esc(x.dataUrl)+'" style="max-width:100%;height:auto" alt="'+esc(x.caption||"블로그 이미지")+'"></figure>';
+   const uploaded=publishedImages[i];
+   const imageSrc=(uploaded&&typeof uploaded.url==="string"&&/^https:\/\//.test(uploaded.url))?uploaded.url:x.dataUrl;
+   return '<figure style="margin:22px 0;text-align:center"><img src="'+esc(imageSrc)+'" style="max-width:100%;height:auto" alt="'+esc(x.caption||"블로그 이미지")+'"></figure>';
  };
  const lines=body.split(/(\[이미지\s*[1-3]\s*삽입\])/g);
  let html='<article><h1>'+title+'</h1>'+imageHtml(0);
@@ -261,6 +264,11 @@ async function copyRichArticle(){
  const e=document.getElementById("richArticlePreview"),st=document.getElementById("richCopyStatus");if(!e)return;
  try{
    const html=e.innerHTML,plain=e.innerText;
+   const bytes=new TextEncoder().encode(html).length;
+   if(bytes>4*1024*1024){
+     st.textContent="이미지 포함 데이터가 "+(bytes/1048576).toFixed(1)+"MB로 네이버의 5MB 제한에 근접하거나 초과합니다. 현재 방식으로는 복사하지 않습니다. 이미지 개별 삽입 또는 전용 확장 프로그램이 필요합니다.";
+     return;
+   }
    if(!navigator.clipboard?.write||!window.ClipboardItem)throw new Error("브라우저 HTML 클립보드 기능 미지원");
    await navigator.clipboard.write([new ClipboardItem({"text/html":new Blob([html],{type:"text/html"}),"text/plain":new Blob([plain],{type:"text/plain"})})]);
    st.textContent="이미지 포함 HTML을 복사했습니다. 네이버에 붙여넣고 이미지 유지 여부를 확인해 주세요.";
