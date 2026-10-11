@@ -259,19 +259,30 @@ function selectRichArticle(){
  const sel=window.getSelection();sel.removeAllRanges();sel.addRange(range);
  document.getElementById("richCopyStatus").textContent="전체 선택했습니다. Ctrl+C로 복사한 후 네이버 글쓰기에서 Ctrl+V를 시험해 주세요.";
 }
+async function compressedRichImage(src){
+ if(!src.startsWith("data:image/"))return src;
+ const im=new Image();im.src=src;
+ await new Promise((resolve,reject)=>{im.onload=resolve;im.onerror=()=>reject(new Error("이미지 로드 실패"))});
+ const canvas=document.createElement("canvas"),scale=Math.min(1,1000/Math.max(im.naturalWidth,im.naturalHeight));
+ canvas.width=Math.max(1,Math.round(im.naturalWidth*scale));canvas.height=Math.max(1,Math.round(im.naturalHeight*scale));
+ const ctx=canvas.getContext("2d");ctx.fillStyle="#fff";ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(im,0,0,canvas.width,canvas.height);
+ return canvas.toDataURL("image/jpeg",0.68);
+}
 async function copyRichArticle(){
  renderRichArticle();
  const e=document.getElementById("richArticlePreview"),st=document.getElementById("richCopyStatus");if(!e)return;
  try{
-   const html=e.innerHTML,plain=e.innerText;
+   const copyNode=e.cloneNode(true);
+   for(const img of copyNode.querySelectorAll("img"))img.src=await compressedRichImage(img.getAttribute("src")||"");
+   const html=copyNode.innerHTML,plain=e.innerText;
    const bytes=new TextEncoder().encode(html).length;
    if(bytes>4*1024*1024){
-     st.textContent="이미지 포함 데이터가 "+(bytes/1048576).toFixed(1)+"MB로 네이버의 5MB 제한에 근접하거나 초과합니다. 현재 방식으로는 복사하지 않습니다. 이미지 개별 삽입 또는 전용 확장 프로그램이 필요합니다.";
+     st.textContent="이미지 포함 데이터가 "+(bytes/1048576).toFixed(1)+"MB로 네이버의 5MB 제한에 근접하거나 초과합니다. 압축 후에도 제한을 초과했습니다. 이미지 개별 삽입 또는 전용 확장 프로그램이 필요합니다.";
      return;
    }
    if(!navigator.clipboard?.write||!window.ClipboardItem)throw new Error("브라우저 HTML 클립보드 기능 미지원");
    await navigator.clipboard.write([new ClipboardItem({"text/html":new Blob([html],{type:"text/html"}),"text/plain":new Blob([plain],{type:"text/plain"})})]);
-   st.textContent="이미지 포함 HTML을 복사했습니다. 네이버에 붙여넣고 이미지 유지 여부를 확인해 주세요.";
+   st.textContent="복사용 이미지를 압축하여 "+(bytes/1048576).toFixed(2)+"MB의 HTML을 복사했습니다. 네이버에서 이미지 4장 유지 여부를 확인해 주세요.";
  }catch(err){selectRichArticle();st.textContent="자동 복사가 제한되어 전체 선택했습니다. Ctrl+C 후 네이버에 붙여넣어 주세요. ("+err.message+")";}
 }
 
