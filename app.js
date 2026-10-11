@@ -235,10 +235,10 @@ function richArticleHtml(){
    const x=images[i];if(!x?.dataUrl)return "";
    return '<figure style="margin:22px 0;text-align:center"><img src="'+esc(x.dataUrl)+'" style="max-width:100%;height:auto" alt="'+esc(x.caption||"블로그 이미지")+'"></figure>';
  };
- const lines=body.split(/(\\[이미지\\s*[1-3]\\s*삽입\\])/g);
+ const lines=body.split(/(\[이미지\s*[1-3]\s*삽입\])/g);
  let html='<article><h1>'+title+'</h1>'+imageHtml(0);
  for(const line of lines){
-   const match=line.match(/^\\[이미지\\s*([1-3])\\s*삽입\\]$/);
+   const match=line.match(/^\[이미지\s*([1-3])\s*삽입\]$/);
    if(match){html+=imageHtml(Number(match[1]));count++;continue}
    if(line.trim())html+='<p style="white-space:pre-wrap">'+esc(line.trim())+'</p>';
  }
