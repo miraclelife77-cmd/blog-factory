@@ -220,9 +220,53 @@ async function prepareNaver(){
     }
     preparedPackage={packageId,images:uploaded,sources:Array.isArray(window.currentSources)?window.currentSources.map(v=>({...v})):[]};
     document.getElementById("publishPack").style.display="block";
+    renderRichArticle();
     st.textContent="준비 완료: 이미지 4장 공용 저장 + 출처 연결 + 본문 위치 지정이 완료되었습니다.";
   }catch(e){st.textContent="게시 준비 실패: "+e.message}
 }
+
+function richArticleHtml(){
+ const title=esc(document.getElementById("title").value.trim());
+ const tags=esc(document.getElementById("tags").value.trim());
+ const body=placeImageMarkers(document.getElementById("content").value);
+ const images=imagePlan.slice(0,4);
+ let count=0;
+ const imageHtml=i=>{
+   const x=images[i];if(!x?.dataUrl)return "";
+   return '<figure style="margin:22px 0;text-align:center"><img src="'+esc(x.dataUrl)+'" style="max-width:100%;height:auto" alt="'+esc(x.caption||"블로그 이미지")+'"></figure>';
+ };
+ const lines=body.split(/(\\[이미지\\s*[1-3]\\s*삽입\\])/g);
+ let html='<article><h1>'+title+'</h1>'+imageHtml(0);
+ for(const line of lines){
+   const match=line.match(/^\\[이미지\\s*([1-3])\\s*삽입\\]$/);
+   if(match){html+=imageHtml(Number(match[1]));count++;continue}
+   if(line.trim())html+='<p style="white-space:pre-wrap">'+esc(line.trim())+'</p>';
+ }
+ if(tags)html+='<p>'+tags+'</p>';
+ return html+'</article>';
+}
+function renderRichArticle(){
+ const e=document.getElementById("richArticlePreview");
+ if(e)e.innerHTML=richArticleHtml();
+}
+function selectRichArticle(){
+ renderRichArticle();
+ const e=document.getElementById("richArticlePreview");if(!e)return;
+ const range=document.createRange();range.selectNodeContents(e);
+ const sel=window.getSelection();sel.removeAllRanges();sel.addRange(range);
+ document.getElementById("richCopyStatus").textContent="전체 선택했습니다. Ctrl+C로 복사한 후 네이버 글쓰기에서 Ctrl+V를 시험해 주세요.";
+}
+async function copyRichArticle(){
+ renderRichArticle();
+ const e=document.getElementById("richArticlePreview"),st=document.getElementById("richCopyStatus");if(!e)return;
+ try{
+   const html=e.innerHTML,plain=e.innerText;
+   if(!navigator.clipboard?.write||!window.ClipboardItem)throw new Error("브라우저 HTML 클립보드 기능 미지원");
+   await navigator.clipboard.write([new ClipboardItem({"text/html":new Blob([html],{type:"text/html"}),"text/plain":new Blob([plain],{type:"text/plain"})})]);
+   st.textContent="이미지 포함 HTML을 복사했습니다. 네이버에 붙여넣고 이미지 유지 여부를 확인해 주세요.";
+ }catch(err){selectRichArticle();st.textContent="자동 복사가 제한되어 전체 선택했습니다. Ctrl+C 후 네이버에 붙여넣어 주세요. ("+err.message+")";}
+}
+
 async function copyPreparedArticle(){
   preparedArticle=placeImageMarkers(document.getElementById("content").value);
   const title=document.getElementById("title").value.trim();
